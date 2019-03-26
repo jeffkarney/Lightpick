@@ -57,13 +57,22 @@
         tooltipNights: false,
         orientation: 'auto',
         disableWeekends: false,
+		ranges: {
+			'All Dates'     : [0, moment()],
+			'Previous Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+			'This Month'    : [moment().startOf('month'), moment().endOf('month')],
+			'Year to Date'  : [moment().startOf('year'), moment()],
+			'Last 365 days' : [moment().add(1, 'days').subtract(1, 'year'), moment()],
+		},
+		showRanges: false,
         locale: {
             buttons: {
-                prev: '&leftarrow;',
-                next: '&rightarrow;',
+                prev: '<span class="fa fa-arrow-left"></span>',
+                next: '<span class="fa fa-arrow-right"></span>',
                 close: '&times;',
                 reset: 'Reset',
                 apply: 'Apply',
+				today: 'Today',
             },
             tooltip: {
                 one: 'day',
@@ -86,6 +95,7 @@
         return '<div class="lightpick__toolbar">'
             + ''
             + '<button type="button" class="lightpick__previous-action" data-view-mode="' + viewMode + '">' + opts.locale.buttons.prev + '</button>'
+		    + '<button type="button" class="lightpick__today-action">' + opts.locale.buttons.today + '</button>'
             + '<button type="button" class="lightpick__next-action" data-view-mode="' + viewMode + '">' + opts.locale.buttons.next + '</button>'
             + (!opts.autoclose ? '<button type="button" class="lightpick__close-action">' + opts.locale.buttons.close + '</button>'  : '')
             + '</div>';
@@ -256,6 +266,23 @@
         var html = '',
             monthDate = moment(opts.calendar[0]);
 
+        if (opts.showRanges !== false && opts.showRanges !== 'right') {
+			html += '<section class="lightpick__ranges">';
+			html += '<header class="lightpick__ranges-title-bar">'
+			html += '<h1 class="lightpick__ranges-title">'
+				+ '<b class="lightpick__ranges-title-accent">Select Range</b> '
+				+ '</h1>';
+			html += '</header>'; // lightpick__ranges-title-bar
+
+			html += '<div class="lightpick__ranges-select">';
+			Object.keys(opts.ranges).forEach(function (rangeLabel) {
+				var range = opts.ranges[rangeLabel];
+				html += '<div class="lightpick__ranges-select-link" data-range-start="' + range[0] + '" data-range-end="' + range[1] + '">' + rangeLabel + '</div>'
+			});
+			html += '</div>'; // lightpick__ranges-select
+
+			html += '</section>'; // lightpick__ranges
+		}
         for (var i = 0; i < opts.numberOfMonths; i++) {
             var day = moment(monthDate);
 
@@ -397,7 +424,11 @@
 
         self.el = document.createElement('section');
 
-        self.el.className = 'lightpick lightpick--' + opts.numberOfColumns + '-columns is-hidden';
+        var columns = opts.numberOfColumns;
+		if (opts.showRanges !== false) {
+			columns++;
+		}
+        self.el.className = 'lightpick lightpick--' + columns + '-columns is-hidden';
 
         if (opts.parentEl !== 'body') {
             self.el.className += ' lightpick--inlined';
@@ -450,7 +481,17 @@
 
             var opts = self._opts;
 
-            if (target.classList.contains('lightpick__day') && target.classList.contains('is-available')) {
+			if (target.classList.contains('lightpick__ranges-select-link')) {
+				self.setStartDate(moment(parseInt(target.dataset['rangeStart'])));
+				self.setEndDate(moment(parseInt(target.dataset['rangeEnd'])));
+				updateDates(self.el, opts);
+				if (opts.autoclose) {
+					setTimeout(function() {
+						self.hide();
+					}, 100);
+				}
+			}
+            else if (target.classList.contains('lightpick__day') && target.classList.contains('is-available')) {
 
                 var day = moment(parseInt(target.getAttribute('data-time')));
 
@@ -562,9 +603,14 @@
                     }
                 }
             }
-            else if (target.classList.contains('lightpick__previous-action')) {
-                if (target.hasAttribute('data-view-mode')) {
-                    var viewMode = target.getAttribute('data-view-mode');
+            else if (target.classList.contains('lightpick__previous-action') || target.parentElement.classList.contains('lightpick__previous-action')) {
+                if (target.hasAttribute('data-view-mode') || target.parentElement.hasAttribute('data-view-mode') ) {
+					if (target.hasAttribute('data-view-mode')) {
+						var viewMode = target.getAttribute('data-view-mode');
+					}
+					else {
+						var viewMode = target.parentElement.getAttribute('data-view-mode');
+					}
 
                     switch (viewMode) {
                         case 'days':
@@ -577,9 +623,14 @@
                     }
                 }
             }
-            else if (target.classList.contains('lightpick__next-action')) {
-                if (target.hasAttribute('data-view-mode')) {
-                    var viewMode = target.getAttribute('data-view-mode');
+            else if (target.classList.contains('lightpick__next-action') || target.parentElement.classList.contains('lightpick__next-action')) {
+				if (target.hasAttribute('data-view-mode') || target.parentElement.hasAttribute('data-view-mode') ) {
+					if (target.hasAttribute('data-view-mode')) {
+						var viewMode = target.getAttribute('data-view-mode');
+					}
+					else {
+						var viewMode = target.parentElement.getAttribute('data-view-mode');
+					}
 
                     switch (viewMode) {
                         case 'days':
@@ -592,6 +643,9 @@
                     }
                 }
             }
+			else if (target.classList.contains('lightpick__today-action') || target.parentElement.classList.contains('lightpick__today-action')) {
+				self.gotoToday();
+			}
             else if (target.classList.contains('lightpick__close-action') || target.classList.contains('lightpick__apply-action')) {
                 self.hide();
             }
@@ -1188,7 +1242,7 @@
                 }
 
                 this.syncFields();
-                
+
                 if (this._opts.secondField && this._opts.secondField === target && this._opts.endDate) {
                     this.gotoDate(this._opts.endDate);
                 }
